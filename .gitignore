@@ -155,6 +155,8 @@ dmypy.json
 cython_debug/
 
 # CloudFlare wrangler
+package-lock.json
+package.json
 node_modules/
 src/endpoints/
 src/node_modules/
