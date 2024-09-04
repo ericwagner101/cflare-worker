@@ -1,17 +1,16 @@
 const EXPECTED_TOKEN = "test-token";
-const queue: string[] = [];
 
+// Random time delay function
 function waitRandomTime(min: number, max: number): Promise<void> {
   const delay = Math.floor(Math.random() * (max - min + 1)) + min;
   return new Promise(resolve => setTimeout(resolve, delay));
 }
-
-// Example usage:
 async function randomTimeWait() {
   await waitRandomTime(15000, 30000); // Wait between 15 and 30 seconds
 }
 
 export default {
+  // Fetch handler for incoming requests
   async fetch(request, env, ctx): Promise<Response> {
     // Extract the token from the Authorization header
     const authHeader = request.headers.get('Authorization');
@@ -36,21 +35,22 @@ export default {
 
     // Check for the required key-value pairs
     if (payload.cgen === 'yes' && payload.ai === 'llm') {
-      // Enqueue the message
+      // Enqueue the message to the Cloudflare queue
       await env.queue.send(payload.cgenmessage);
       return new Response('Added to queue', {status: 200});
     } else {
       return new Response('Invalid payload', {status: 400});
     }
   },
+  // Queue handler for processing messages from the queue
   async queue(batch, env): Promise<void> {
     await randomTimeWait();
     let messages = JSON.stringify(batch.messages);
     console.log(`Consumed from queue: ${messages}`);
   }
-}satisfies ExportedHandler<Env>;
+} satisfies ExportedHandler<Env>;
 
+// Interface for the environment object
 export interface Env {
-   queue: Queue<any>;
+   queue: Queue<any>; // Cloudflare queue
 }
-
