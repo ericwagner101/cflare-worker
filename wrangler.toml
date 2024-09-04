@@ -83,6 +83,10 @@ compatibility_date = "2024-08-21"
 # binding = "MY_QUEUE"
 # queue = "my-queue"
 
+[[queues.producers]]
+binding = "queue"
+queue = "cflare-queue"
+
 # Bind a Queue consumer. Queue Consumers can retrieve tasks scheduled by Producers to act on them.
 # Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#queues
 # [[queues.consumers]]
