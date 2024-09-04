@@ -1,6 +1,16 @@
 const EXPECTED_TOKEN = "test-token";
 const queue: string[] = [];
 
+function waitRandomTime(min: number, max: number): Promise<void> {
+  const delay = Math.floor(Math.random() * (max - min + 1)) + min;
+  return new Promise(resolve => setTimeout(resolve, delay));
+}
+
+// Example usage:
+async function randomTimeWait() {
+  await waitRandomTime(15000, 30000); // Wait between 15 and 30 seconds
+}
+
 export default {
   async fetch(request, env, ctx): Promise<Response> {
     // Extract the token from the Authorization header
@@ -34,6 +44,7 @@ export default {
     }
   },
   async queue(batch, env): Promise<void> {
+    await randomTimeWait();
     let messages = JSON.stringify(batch.messages);
     console.log(`Consumed from queue: ${messages}`);
   }
