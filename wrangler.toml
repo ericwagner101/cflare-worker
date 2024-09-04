@@ -91,6 +91,8 @@ queue = "cflare-queue"
 # Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#queues
 # [[queues.consumers]]
 # queue = "my-queue"
+[[queues.consumers]]
+queue = "cflare-queue"
 
 # Bind an R2 Bucket. Use R2 to store arbitrarily large blobs of data, such as files.
 # Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#r2-buckets
