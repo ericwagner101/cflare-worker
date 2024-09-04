@@ -44,7 +44,7 @@ export default {
   },
   // Queue handler for processing messages from the queue
   async queue(batch, env): Promise<void> {
-    await randomTimeWait();
+    await randomTimeWait(); // This will 15 and 30 seconds (the message will already be popped from the queue)
     let messages = JSON.stringify(batch.messages);
     console.log(`Consumed from queue: ${messages}`);
   }
