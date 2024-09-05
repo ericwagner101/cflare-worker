@@ -1,22 +1,31 @@
 # Cloudflare Workers Example 
 Basic CloudFlare worker example and test scripts.
 
-## Get started
+## Initial Setup 
 
 1. Set up [CloudFlare account](https://dash.cloudflare.com/sign-up/workers-and-pages)
 2. In CloudFlare dashboard [Enable Queues](https://developers.cloudflare.com/queues/get-started/#1-enable-queues)
 3. Install [nvm](https://docs.npmjs.com/getting-started)
 4. Install [Node.js](https://nodejs.org/en/download/package-manager) Use the nvm installer.
-5. Run `npm install wrangler --save-dev`
-6. Run `npx wrangler dev`
-7. You may need to add wrangler to your path by runing `source ./setenv.sh` (or simply add the path to wrangler in your path.)
-8. If you are not already logged in run `npx wrangler login` to login to your Cloudflare account in wrangler
-9. To create a CloudFlare Queue run `npx wrangler queues create cflare-queue`
+
+## DB Creation and Setup
+1. Create [GCP Cloud SQL PostgreSQL](https://cloud.google.com/sql/docs/postgres) and note the database and connection details.
+2. Set up [Postgres](https://developers.cloudflare.com/hyperdrive/examples/google-cloud-sql/) and note the hyperdrive configuration name created. Add the id to wrangler.toml. Note that the DB related code is already in src/index.ts
+3. Create a Postgres table from the psql cli: `CREATE TABLE messages (id serial PRIMARY KEY, messages TEXT);`
+4. Add rights psql cli `GRANT INSERT ON messages TO "hyperdrive-user"; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA postgres TO "hyperdrive-user";`
+
+## CloudFlare Wrangler Deploy and Install
+1. Run `npm install wrangler --save-dev`
+2. Run `npx wrangler dev`
+3. You may need to add wrangler to your path by runing `source ./setenv.sh` (or simply add the path to wrangler in your path.)
+4. If you are not already logged in run `npx wrangler login` to login to your Cloudflare account in wrangler
+5. To create a CloudFlare Queue run `npx wrangler queues create cflare-queue`
 
 ## Deploying and Testing
 1. Run `npx wrangler deploy` and make sure to copy the deployed https url from the output.
 2. Run `npx wrangler tail` to tail worker (and queue).
 3. In a separate shell run `./api_test.sh <the_deployed_url` and watch the wrangler tail shell window.
+4. To see messages in DB run on psql cli `SELECT * FROM messages;`
 
 ## Project structure
 
