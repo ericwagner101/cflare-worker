@@ -45,16 +45,15 @@ export default {
   },
   // Queue handler for processing messages from the queue and write to database
   async queue(batch, env): Promise<void> {
-    await randomTimeWait(); // This will wait 15 and 30 seconds (the message will already be popped from the queue)
     let messages = JSON.stringify(batch.messages);
-    console.log(`Consumed from queue: ${messages}`);
+    console.log(`Popped from queue: ${messages}`);
+    await randomTimeWait(); // This will wait 15 and 30 seconds (the message will already be popped from the queue)
     // Write to the database
     const sql = postgres(env.HYPERDRIVE.connectionString);
     try {
       // Insert the message into the database
       const result = await sql`INSERT INTO messages (messages) VALUES (${messages});`
-
-      // Returns result rows as JSON
+      console.log(`Message written to database`);
       return Response.json({ result: result });
     } catch (e) {
       console.log(e);
