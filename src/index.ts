@@ -1,4 +1,5 @@
 const EXPECTED_TOKEN = "test-token";
+import postgres from 'postgres'
 
 // Random time delay function
 function waitRandomTime(min: number, max: number): Promise<void> {
@@ -42,15 +43,28 @@ export default {
       return new Response('Invalid payload', {status: 400});
     }
   },
-  // Queue handler for processing messages from the queue
+  // Queue handler for processing messages from the queue and write to database
   async queue(batch, env): Promise<void> {
-    await randomTimeWait(); // This will 15 and 30 seconds (the message will already be popped from the queue)
+    await randomTimeWait(); // This will wait 15 and 30 seconds (the message will already be popped from the queue)
     let messages = JSON.stringify(batch.messages);
     console.log(`Consumed from queue: ${messages}`);
+    // Write to the database
+    const sql = postgres(env.HYPERDRIVE.connectionString);
+    try {
+      // Insert the message into the database
+      const result = await sql`INSERT INTO messages (messages) VALUES (${messages});`
+
+      // Returns result rows as JSON
+      return Response.json({ result: result });
+    } catch (e) {
+      console.log(e);
+      return Response.json({ error: e.message }, { status: 500 });
+    }
   }
 } satisfies ExportedHandler<Env>;
 
 // Interface for the environment object
 export interface Env {
-   queue: Queue<any>; // Cloudflare queue
+  queue: Queue<any>; // Cloudflare queue
+  HYPERDRIVE: Hyperdrive;
 }
