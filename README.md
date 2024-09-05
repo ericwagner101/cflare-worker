@@ -9,7 +9,7 @@ Basic CloudFlare worker example and test scripts.
 4. Install [Node.js](https://nodejs.org/en/download/package-manager) Use the nvm installer.
 
 ## DB Creation and Setup
-1. Create [GCP Cloud SQL PostgreSQL](https://cloud.google.com/sql/docs/postgres) and note the database and connection details.
+1. Create [GCP Cloud SQL PostgreSQL](https://cloud.google.com/sql/docs/postgres) and note the database and connection details. Other databases can be used as well. See [CloudFlare Storage Options](https://developers.cloudflare.com/workers/platform/storage-options/).
 2. Set up [Postgres](https://developers.cloudflare.com/hyperdrive/examples/google-cloud-sql/) and note the hyperdrive configuration name created. Add the id to wrangler.toml. Note that the DB related code is already in src/index.ts
 3. Create a Postgres table from the psql cli: `CREATE TABLE messages (id serial PRIMARY KEY, messages TEXT);`
 4. Add rights psql cli `GRANT INSERT ON messages TO "hyperdrive-user"; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA postgres TO "hyperdrive-user";`
