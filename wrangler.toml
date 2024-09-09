@@ -54,11 +54,19 @@ compatibility_flags = ["nodejs_compat"]
 # name = "MY_DURABLE_OBJECT"
 # class_name = "MyDurableObject"
 
+[[durable_objects.bindings]]
+name = "MESSAGE_STORE"
+class_name = "MessageStore"
+
 # Durable Object migrations.
 # Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#migrations
 # [[migrations]]
 # tag = "v1"
 # new_classes = ["MyDurableObject"]
+
+[[migrations]]
+tag = "v1" # Should be unique for each entry
+new_classes = ["MessageStore"]
 
 # Bind a Hyperdrive configuration. Use to accelerate access to your existing databases from Cloudflare Workers.
 # Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#hyperdrive
@@ -68,7 +76,7 @@ compatibility_flags = ["nodejs_compat"]
 
 [[hyperdrive]]
 binding = "HYPERDRIVE"
-id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+id = "66101248c62b4ce49e45699b81b8e9ae"
 
 # Bind a KV Namespace. Use KV as persistent storage for small key-value pairs.
 # Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#kv-namespaces
