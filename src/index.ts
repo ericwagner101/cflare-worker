@@ -1,10 +1,33 @@
+import { Hono } from 'hono';
 import { MessageStore } from './MessageStore';
-import { DurableObjectNamespace, ExportedHandler } from '@cloudflare/workers-types';
+import { DurableObjectNamespace, ExportedHandler, Request as CfRequest, Headers as CfHeaders } from '@cloudflare/workers-types';
+import postgres from 'postgres';
 
 export { MessageStore };
 
+const app = new Hono();
+
 const EXPECTED_TOKEN = "test-token";
-import postgres from 'postgres';
+
+export interface Env {
+  MESSAGE_STORE: DurableObjectNamespace;
+  HYPERDRIVE: Hyperdrive;
+  queue: Queue<any>; // Cloudflare queue
+}
+
+interface Queue<T> {
+  send(message: T): Promise<void>;
+  pop(): Promise<T[]>; // Use pop() instead of get()
+}
+
+interface Hyperdrive {
+  connectionString: string;
+}
+
+// Extend the Headers type to include getSetCookie
+interface ExtendedHeaders extends CfHeaders {
+  getSetCookie?: () => string[];
+}
 
 // Random time delay function
 function waitRandomTime(min: number, max: number): Promise<void> {
@@ -16,98 +39,122 @@ async function randomTimeWait() {
   await waitRandomTime(15000, 30000); // Wait between 15 and 30 seconds
 }
 
-export default {
-  async fetch(request, env, ctx): Promise<Response> {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response('Unauthorized: No token provided', { status: 401 });
-    }
+// Middleware for authentication
+app.use('*', async (c, next) => {
+  console.log('Middleware hit');
+  const authHeader = c.req.header('Authorization');
+  console.log('Authorization Header:', authHeader); // Log the header for debugging
 
-    const token = authHeader.split(' ')[1]; // Assuming the header is in the format "Bearer <token>"
-    if (token !== EXPECTED_TOKEN) {
-      return new Response('Unauthorized: Invalid token', { status: 401 });
-    }
-
-    let payload;
-    try {
-      payload = await request.json();
-    } catch (e) {
-      return new Response('Bad Request: Invalid JSON', { status: 400 });
-    }
-
-    if (payload.cgen === 'yes' && payload.ai === 'llm') {
-      const stream = new ReadableStream({
-        async start(controller) {
-          const encoder = new TextEncoder();
-
-          function sendStatus(status: string) {
-            controller.enqueue(encoder.encode(`data: ${status}\n\n`));
-          }
-
-          sendStatus('Processing started');
-
-          // Interact with the Durable Object
-          const id = env.MESSAGE_STORE.idFromName('message-store');
-          const obj = env.MESSAGE_STORE.get(id);
-          const baseUrl = `https://${env.MESSAGE_STORE.idFromName('message-store').toString()}.workers.dev`;
-
-          await obj.fetch(new Request(`${baseUrl}/add`, {
-            method: 'POST',
-            body: JSON.stringify(payload.cgenmessage)
-          }));
-          sendStatus('Message stored in Durable Object');
-
-          // Enqueue the message to the Cloudflare queue
-          await env.queue.send(payload.cgenmessage);
-
-          // Simulate processing delay
-          await randomTimeWait();
-          sendStatus('Processing finished');
-
-          // Retrieve message from Durable Object
-          const response = await obj.fetch(`${baseUrl}/get`);
-          const messages = await response.json();
-          sendStatus(`Retrieved from Durable Object: ${JSON.stringify(messages)}`);
-
-          // Write to the database
-          const sql = postgres(env.HYPERDRIVE.connectionString);
-          try {
-            const result = await sql`INSERT INTO messages (messages) VALUES (${JSON.stringify(messages)})`;
-            sendStatus('Message written to database');
-          } catch (e) {
-            sendStatus(`Error: ${e.message}`);
-          }
-
-          controller.close();
-        }
-      });
-
-      return new Response(stream, {
-        headers: { "Content-Type": "text/event-stream" }
-      });
-    } else {
-      return new Response('Invalid payload', { status: 400 });
-    }
-  },
-
-  async queue(batch, env): Promise<void> {
-    let messages = JSON.stringify(batch.messages);
+  if (!authHeader) {
+    return c.text('Unauthorized: No token provided', 401);
   }
-} satisfies ExportedHandler<Env>;
 
-// Interface for the environment object
-export interface Env {
-  MESSAGE_STORE: DurableObjectNamespace;
-  HYPERDRIVE: Hyperdrive;
-  queue: Queue<any>; // Cloudflare queue
+  const token = authHeader.split(' ')[1]; // Assuming the header is in the format "Bearer <token>"
+  console.log('Authorization Token:', token); // Log the token for debugging
+
+  if (token !== EXPECTED_TOKEN) {
+    console.log('Invalid token:', token); // Log the invalid token
+    return c.text('Unauthorized: Invalid token', 401);
+  }
+
+  await next();
+  console.log('Middleware passed');
+});
+
+// Log the request path and method
+app.use('*', async (c, next) => {
+  console.log(`Request Path: ${c.req.path}`);
+  console.log(`Request Method: ${c.req.method}`);
+  await next();
+});
+
+app.post('/', async (c) => {
+  console.log('POST route hit');
+  let payload;
+  try {
+    payload = await c.req.json();
+  } catch (e) {
+    return c.text('Bad Request: Invalid JSON', 400);
+  }
+
+  if (payload.cgen === 'yes' && payload.ai === 'llm') {
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+
+        function sendStatus(status: string) {
+          controller.enqueue(encoder.encode(`data: ${status}\n\n`));
+        }
+
+        sendStatus('Processing started');
+
+        // Interact with the Durable Object
+        const id = (c.env as Env).MESSAGE_STORE.idFromName('message-store');
+        const obj = (c.env as Env).MESSAGE_STORE.get(id);
+        const baseUrl = `https://${id.toString()}.workers.dev`;
+
+        await obj.fetch(new Request(`${baseUrl}/add`, {
+          method: 'POST',
+          body: JSON.stringify(payload.cgenmessage)
+        } as RequestInit));
+        sendStatus('Message stored in Durable Object');
+
+        // Enqueue the message to the Cloudflare queue
+        await (c.env as Env).queue.send(payload.cgenmessage);
+        sendStatus('Message added to queue');
+
+        // Simulate processing delay
+        await randomTimeWait();
+        sendStatus('Processing finished');
+
+        // Retrieve message from Durable Object
+        const response = await obj.fetch(new Request(`${baseUrl}/get` as RequestInfo));
+        const messages = await response.json();
+        sendStatus(`Retrieved from Durable Object: ${JSON.stringify(messages)}`);
+
+        // Write to the database
+        const sql = postgres((c.env as Env).HYPERDRIVE.connectionString);
+        try {
+          const result = await sql`INSERT INTO messages (messages) VALUES (${JSON.stringify(messages)})`;
+          sendStatus('Message written to database');
+        } catch (e) {
+          sendStatus(`Error: ${e.message}`);
+        }
+
+        controller.close();
+      }
+    });
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/event-stream" }
+    });
+  } else {
+    return c.text('Invalid payload', 400);
+  }
+});
+
+app.post('/queue', async (c) => {
+  console.log('POST /queue route hit');
+  const reqBody = await c.req.json();
+  let messages = JSON.stringify(reqBody.messages);
+  console.log(`Popped from queue: ${messages}`);
+  return c.text('Queue processed');
+});
+
+// Define the queue handler with type checking
+async function queueHandler(batch: any[], env: Env) {
 }
 
-// Define the Queue and Hyperdrive types
-interface Queue<T> {
-  send(message: T): Promise<void>;
-  pop(): Promise<T[]>; // Use pop() instead of get()
-}
+// Add this catch-all route at the end of your route definitions
+app.all('*', (c) => {
+  console.log(`Unmatched request - Path: ${c.req.path}, Method: ${c.req.method}`);
+  return c.text('Not Found', 404);
+});
 
-interface Hyperdrive {
-  connectionString: string;
-}
+// Register the queue handler
+const handler: ExportedHandler<Env> = {
+  fetch: app.fetch as unknown as ExportedHandlerFetchHandler<Env>,
+  queue: queueHandler as unknown as ExportedHandlerQueueHandler<Env>
+};
+
+export default handler;
